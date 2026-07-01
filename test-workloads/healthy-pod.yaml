@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthy-demo
+  namespace: default
+  labels:
+    app: healthy-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: healthy-demo
+  template:
+    metadata:
+      labels:
+        app: healthy-demo
+    spec:
+      containers:
+        - name: healthy
+          image: busybox:1.36
+          command: ["sh", "-c", "while true; do echo healthy; sleep 30; done"]

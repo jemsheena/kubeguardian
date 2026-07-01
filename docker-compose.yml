@@ -1,0 +1,58 @@
+services:
+  controller:
+    build: .
+    container_name: kubeguardian-controller
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount host kubeconfig so the controller can reach your local kind cluster.
+      - ${USERPROFILE}/.kube/config:/home/kubeguardian/.kube/config:ro
+      - incident-logs:/var/log/kubeguardian
+    environment:
+      KUBECONFIG: /home/kubeguardian/.kube/config
+      METRICS_PORT: "8000"
+      PENDING_THRESHOLD_SECONDS: "60"
+      HEAL_COOLDOWN_SECONDS: "120"
+      LOG_LEVEL: INFO
+    networks:
+      - kubeguardian
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: kubeguardian-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    networks:
+      - kubeguardian
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: kubeguardian-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - kubeguardian
+    restart: unless-stopped
+
+networks:
+  kubeguardian:
+    driver: bridge
+
+volumes:
+  incident-logs:
