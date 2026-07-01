@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: kubeguardian
+  labels:
+    app.kubernetes.io/name: kubeguardian
+    app.kubernetes.io/component: controller
+rules:
+  # Watch and remediate pods
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "delete"]
+  # Resolve pod -> Deployment ownership chain
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+  # Pending/Failed heals patch spec.template.metadata.annotations.kubeguardian/restartedAt
+  # to trigger a Deployment rollout restart (see controller/healer.py); get resolves owner.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "patch"]
