@@ -1,0 +1,36 @@
+# HELP python_gc_objects_collected_total Objects collected during gc
+# TYPE python_gc_objects_collected_total counter
+python_gc_objects_collected_total{generation="0"} 391.0
+python_gc_objects_collected_total{generation="1"} 0.0
+python_gc_objects_collected_total{generation="2"} 0.0
+# HELP python_gc_objects_uncollectable_total Uncollectable objects found during GC
+# TYPE python_gc_objects_uncollectable_total counter
+python_gc_objects_uncollectable_total{generation="0"} 0.0
+python_gc_objects_uncollectable_total{generation="1"} 0.0
+python_gc_objects_uncollectable_total{generation="2"} 0.0
+# HELP python_gc_collections_total Number of times this generation was collected
+# TYPE python_gc_collections_total counter
+python_gc_collections_total{generation="0"} 59.0
+python_gc_collections_total{generation="1"} 5.0
+python_gc_collections_total{generation="2"} 0.0
+# HELP python_info Python platform information
+# TYPE python_info gauge
+python_info{implementation="CPython",major="3",minor="13",patchlevel="1",version="3.13.1"} 1.0
+# HELP incidents_detected_total Total number of pod failure incidents detected
+# TYPE incidents_detected_total counter
+incidents_detected_total{namespace="default",reason="CrashLoopBackOff"} 3.0
+# HELP incidents_detected_created Total number of pod failure incidents detected
+# TYPE incidents_detected_created gauge
+incidents_detected_created{namespace="default",reason="CrashLoopBackOff"} 1.7829237164819164e+09
+# HELP incidents_resolved_total Total number of incidents successfully remediated
+# TYPE incidents_resolved_total counter
+incidents_resolved_total{namespace="default",reason="CrashLoopBackOff"} 1.0
+# HELP incidents_resolved_created Total number of incidents successfully remediated
+# TYPE incidents_resolved_created gauge
+incidents_resolved_created{namespace="default",reason="CrashLoopBackOff"} 1.782923716590674e+09
+# HELP pod_restarts_total Total number of pod restart/remediation actions taken
+# TYPE pod_restarts_total counter
+pod_restarts_total{action="delete_pod",namespace="default"} 1.0
+# HELP pod_restarts_created Total number of pod restart/remediation actions taken
+# TYPE pod_restarts_created gauge
+pod_restarts_created{action="delete_pod",namespace="default"} 1.782923716590643e+09
