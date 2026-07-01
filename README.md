@@ -1,10 +1,41 @@
 # KubeGuardian
 
-KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for **local kind clusters**. It detects failing pods (CrashLoopBackOff, long-running Pending, Failed), remediates them automatically, exports Prometheus metrics, and logs incidents to a JSON-lines file.
+KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for local kind clusters. It detects failing pods, remediates them automatically, exports Prometheus metrics, and logs incidents to a JSON-lines file.
 
-> **Scope:** This weekend build targets a local [kind](https://kind.sigs.k8s.io/) cluster only — no cloud IAM, ingress controllers, or multi-cluster federation.
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Live results
+> Scope: this build targets a local kind cluster only — no cloud IAM, ingress controllers, or multi-cluster federation.
+
+## Table of contents
+
+- [Features](#features)
+- [Demo](#demo)
+- [Architecture](#architecture)
+- [How it works](#how-it-works)
+- [Project layout](#project-layout)
+- [Getting started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Quick start](#quick-start)
+    - [Option A](#option-a--on-the-host-recommended-for-kind)
+    - [Option B](#option-b--via-docker-compose)
+    - [Option C](#option-c--in-cluster-rbac-included)
+- [Configuration](#configuration)
+- [Metrics and observability](#metrics-and-observability)
+- [Roadmap](#roadmap)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- Watch pods in a local kind cluster and detect CrashLoopBackOff, Pending, and Failed states.
+- Heal crash-looping workloads by deleting pods and restarting rollout-managed workloads via Deployment patching.
+- Expose Prometheus metrics for detected incidents, resolved incidents, and healing actions.
+- Persist incidents as JSON-lines for local demos and future database-backed storage.
+- Run alongside Prometheus and Grafana for live observability.
+
+## Demo
 
 These screenshots show real data captured from a running KubeGuardian demo with the controller, Prometheus, and Grafana all active.
 
@@ -17,19 +48,15 @@ The images demonstrate the project goal:
 
 | Grafana dashboard | Prometheus query |
 |---|---|
-| ![Grafana dashboard](docs/screenshots/grafana-live.png) | ![Prometheus query](docs/screenshots/prometheus-live.png) |
+| ![Grafana dashboard](docs/screenshots/Screenshot%202026-07-01%20221905.png) | ![Prometheus query](docs/screenshots/Screenshot%202026-07-01%20221915.png) |
 
-| Metrics endpoint output | Incident log |
+| Metrics endpoint output | Pod state |
 |---|---|
-| ![Metrics output](docs/screenshots/metrics-live.png) | ![Incident log](docs/screenshots/incident-log-live.png) |
-
-| Pod state |
-|---|
-| ![kubectl pods](docs/screenshots/kubectl-pods-live.png) |
+| ![Metrics endpoint output](docs/screenshots/Screenshot%202026-07-01%20221927.png) | ![Pod state](docs/screenshots/Screenshot%202026-07-01%20222300.png) |
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │                        kind cluster                              │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐ │
@@ -60,28 +87,29 @@ The images demonstrate the project goal:
                                               └────────────────────┘
 ```
 
-### Detection & remediation
+## How it works
 
-| Failure state        | Detection rule                              | Action                          |
-|---------------------|---------------------------------------------|---------------------------------|
-| CrashLoopBackOff    | Container `waiting.reason`                  | Delete pod (controller recreates)|
-| Pending             | Phase Pending longer than threshold         | Rollout restart owning Deployment|
-| Failed              | Phase `Failed`                              | Rollout restart owning Deployment|
+### Detection and remediation
 
-For Pending/Failed rollout restarts, the healer resolves the owning Deployment by walking `ownerReferences` from pod → ReplicaSet → Deployment (or pod → Deployment when owned directly).
+| Failure state | Detection rule | Action |
+|---|---|---|
+| CrashLoopBackOff | Container `waiting.reason` | Delete pod (controller recreates) |
+| Pending | Phase Pending longer than threshold | Rollout restart owning Deployment |
+| Failed | Phase `Failed` | Rollout restart owning Deployment |
 
-Default **Pending threshold** is 120 seconds (`PENDING_THRESHOLD_SECONDS`). `docker-compose.yml` overrides this to 60 seconds for faster local demos.
+For Pending and Failed rollout restarts, the healer resolves the owning Deployment by walking `ownerReferences` from pod → ReplicaSet → Deployment (or pod → Deployment when owned directly).
 
-A per-workload **cooldown** prevents heal loops. Default is 300 seconds (`HEAL_COOLDOWN_SECONDS`); `docker-compose.yml` sets 120 seconds.
+Default Pending threshold is 120 seconds (`PENDING_THRESHOLD_SECONDS`). The Compose stack overrides this to 60 seconds for faster local demos.
+
+A per-workload cooldown prevents heal loops. The default is 300 seconds (`HEAL_COOLDOWN_SECONDS`), and the Compose stack sets it to 120 seconds.
 
 ## Project layout
 
-```
+```text
 kubeguardian/
 ├── controller/           # Python controller
 ├── deploy/               # ServiceAccount, RBAC, in-cluster Deployment
 ├── docs/screenshots/     # README demo screenshots
-├── scripts/              # Screenshot generator
 ├── tests/                # pytest unit tests
 ├── test-workloads/       # Demo Deployments for kind
 ├── monitoring/           # Prometheus + Grafana config
@@ -91,23 +119,25 @@ kubeguardian/
 └── requirements-dev.txt
 ```
 
-## Prerequisites
+## Getting started
+
+### Prerequisites
 
 - [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)
 - Python 3.11+ (for running the controller directly on the host)
 
-## Quick start (kind)
+### Quick start
 
-### 1. Create a local kind cluster
+#### 1. Create a local kind cluster
 
 ```bash
 kind create cluster --name kubeguardian
 kubectl cluster-info --context kind-kubeguardian
 ```
 
-### 2. Deploy test workloads
+#### 2. Deploy test workloads
 
 ```bash
 kubectl apply -f test-workloads/healthy-pod.yaml
@@ -117,9 +147,9 @@ kubectl get pods -w
 
 Within a minute or two the crashloop pod should enter `CrashLoopBackOff`. The healthy pod should stay `Running`.
 
-### 3. Run the controller
+#### 3. Run the controller
 
-**Option A — on the host (recommended for kind)**
+##### Option A — on the host (recommended for kind)
 
 The controller reads your local kubeconfig and talks to kind directly:
 
@@ -132,21 +162,21 @@ python -m controller.main
 
 For incident logs on the host, set a writable path (the default `/var/log/...` path is intended for containers):
 
-```bash
+```powershell
 # Windows PowerShell
 $env:INCIDENT_LOG_PATH = ".\incidents.jsonl"
 python -m controller.main
 ```
 
-**Option B — via Docker Compose**
+##### Option B — via Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-> **Note (kind + Docker):** kind's API server is usually `https://127.0.0.1:<port>`. From inside a container that address is the container itself, not your host. For docker-compose on Windows/macOS, either run the controller on the host (Option A) or point kubeconfig at `https://host.docker.internal:<port>` (see [kind known issues](https://kind.sigs.k8s.io/docs/user/known-issues/#pod-to-host-port-mapping)).
+> Note: kind's API server is usually `https://127.0.0.1:<port>`. From inside a container that address is the container itself, not your host. For Docker Compose on Windows or macOS, either run the controller on the host (Option A) or point kubeconfig at `https://host.docker.internal:<port>`.
 
-**Option C — in-cluster (RBAC included)**
+##### Option C — in-cluster (RBAC included)
 
 Apply least-privilege RBAC and run inside the cluster:
 
@@ -162,70 +192,62 @@ kubectl apply -f deploy/deployment.yaml
 kubectl logs -l app.kubernetes.io/name=kubeguardian -f
 ```
 
-The ClusterRole grants only what the controller needs: watch/get/list/delete on **pods**, get on **replicasets**, and get/patch on **deployments**. **Patch** is required for Pending/Failed heals — the healer triggers a rollout restart by patching `spec.template.metadata.annotations.kubeguardian/restartedAt`, not by deleting the Deployment. CrashLoopBackOff heals only delete the pod.
+The ClusterRole grants only what the controller needs: watch/get/list/delete on pods, get on ReplicaSets, and get/patch on Deployments. Patch is required for Pending and Failed heals, while CrashLoopBackOff heals only delete the pod.
 
-This demo uses a **ClusterRole** so the controller can watch all namespaces by default. If you set `WATCH_NAMESPACES` to specific namespaces in production, prefer a namespaced **Role** + **RoleBinding** per namespace instead (same verbs, smaller blast radius).
-
-### 4. Watch it heal
+#### 4. Watch it heal
 
 ```bash
 kubectl get pods -l app=crashloop-demo -w
 curl http://localhost:8000/metrics | grep incidents_
 ```
 
-**Incident log — depends on how you run the controller:**
-
-| Run mode              | How to view the log |
-|-----------------------|---------------------|
-| Host (Option A)       | `cat incidents.jsonl` (or your `INCIDENT_LOG_PATH`) |
-| Docker Compose (B)    | `docker compose exec controller cat /var/log/kubeguardian/incidents.jsonl` |
+| Run mode | How to view the log |
+|---|---|
+| Host (Option A) | `cat incidents.jsonl` (or your `INCIDENT_LOG_PATH`) |
+| Docker Compose (Option B) | `docker compose exec controller cat /var/log/kubeguardian/incidents.jsonl` |
 | In-cluster (Option C) | `kubectl logs -l app.kubernetes.io/name=kubeguardian` and check the mounted volume via exec |
 
 You should see the crashloop pod deleted and recreated, metrics increment, and a JSON line in the incident log.
 
-### 5. Open dashboards
+#### 5. Open dashboards
 
-Start Prometheus and Grafana (works with host or compose controller):
+Start Prometheus and Grafana (works with host or Compose controller):
 
 ```bash
 docker compose up prometheus grafana
 ```
 
-| Service    | URL                          | Credentials   |
-|-----------|------------------------------|---------------|
-| Metrics   | http://localhost:8000/metrics | —            |
-| Prometheus| http://localhost:9090       | —            |
-| Grafana   | http://localhost:3000         | admin / admin |
+| Service | URL | Credentials |
+|---|---|---|
+| Metrics | http://localhost:8000/metrics | — |
+| Prometheus | http://localhost:9090 | — |
+| Grafana | http://localhost:3000 | admin / admin |
 
-Prometheus scrapes `controller:8000` when the controller runs in Docker Compose, and `host.docker.internal:8000` when the controller runs on the host (Option A).
-
-The **KubeGuardian** dashboard is auto-provisioned under the *KubeGuardian* folder.
+Prometheus scrapes `controller:8000` when the controller runs in Docker Compose, and `host.docker.internal:8000` when the controller runs on the host.
 
 ## Configuration
 
 Environment variables (see `controller/config.py`):
 
-| Variable                  | Default                              | Description                          |
-|---------------------------|--------------------------------------|--------------------------------------|
-| `WATCH_NAMESPACES`        | *(all)*                              | Comma-separated list, e.g. `default` |
-| `PENDING_THRESHOLD_SECONDS` | `120` (`60` in docker-compose)   | Pending age before incident          |
-| `HEAL_COOLDOWN_SECONDS`   | `300` (`120` in docker-compose)      | Min seconds between heals per workload |
-| `POLL_INTERVAL`           | `5`                                  | Watch reconnect interval             |
-| `METRICS_PORT`            | `8000`                               | Prometheus scrape port               |
-| `INCIDENT_LOG_PATH`       | `/var/log/kubeguardian/incidents.jsonl` | JSON-lines log path              |
-| `LOG_LEVEL`               | `INFO`                               | Python log level                     |
+| Variable | Default | Description |
+|---|---|---|
+| `WATCH_NAMESPACES` | *(all)* | Comma-separated list, for example `default` |
+| `PENDING_THRESHOLD_SECONDS` | `120` (`60` in Docker Compose) | Pending age before incident |
+| `HEAL_COOLDOWN_SECONDS` | `300` (`120` in Docker Compose) | Minimum seconds between heals per workload |
+| `POLL_INTERVAL` | `5` | Watch reconnect interval |
+| `METRICS_PORT` | `8000` | Prometheus scrape port |
+| `INCIDENT_LOG_PATH` | `/var/log/kubeguardian/incidents.jsonl` | JSON-lines log path |
+| `LOG_LEVEL` | `INFO` | Python log level |
 
-## Prometheus metrics
+## Metrics and observability
 
-| Metric                     | Labels              | Description                |
-|---------------------------|---------------------|----------------------------|
-| `incidents_detected_total`| `namespace`, `reason` | Failures detected        |
-| `incidents_resolved_total`| `namespace`, `reason` | Successful remediations  |
-| `pod_restarts_total`      | `namespace`, `action` | Actions taken (`delete_pod`, `rollout_restart`) |
+| Metric | Labels | Description |
+|---|---|---|
+| `incidents_detected_total` | `namespace`, `reason` | Failures detected |
+| `incidents_resolved_total` | `namespace`, `reason` | Successful remediations |
+| `pod_restarts_total` | `namespace`, `action` | Actions taken (`delete_pod`, `rollout_restart`) |
 
-## Incident log format
-
-Each line in `incidents.jsonl`:
+Each line in `incidents.jsonl` follows this format:
 
 ```json
 {"timestamp": "2026-07-01T12:00:00+00:00", "namespace": "default", "pod": "crashloop-demo-abc123", "reason": "CrashLoopBackOff", "action": "delete_pod", "resolved": true}
@@ -233,23 +255,14 @@ Each line in `incidents.jsonl`:
 
 This file is a stand-in for PostgreSQL persistence in a later phase.
 
-## Demo walkthrough
-
-1. `kind create cluster --name kubeguardian`
-2. `kubectl apply -f test-workloads/`
-3. `python -m controller.main` in one terminal (set `INCIDENT_LOG_PATH` on Windows)
-4. `docker compose up prometheus grafana` in another
-5. Deploy crashloop workload and watch Grafana counters climb
-6. Confirm healthy-demo pod is never touched
-
 ## Roadmap
 
 Planned next phases (not in this build):
 
-- **PostgreSQL** — durable incident store replacing JSON-lines log
-- **Helm chart** — package controller for in-cluster deployment
-- **GitHub Actions CI/CD** — lint, test, image publish on merge
-- **Slack / email alerting** — notify on incidents and failed heals
+- PostgreSQL — durable incident store replacing JSON-lines log
+- Helm chart — package the controller for in-cluster deployment
+- GitHub Actions CI/CD — lint, test, and image publish on merge
+- Slack or email alerting — notify on incidents and failed heals
 
 ## Development
 
@@ -260,8 +273,12 @@ python -m controller.main
 python scripts/generate_screenshots.py   # refresh README demo images
 ```
 
-Unit tests cover pod failure detection (CrashLoopBackOff, Pending threshold, Failed), heal action routing, cooldown behavior, and Deployment ownership resolution (pod → ReplicaSet → Deployment via `ownerReferences`).
+Unit tests cover pod failure detection, heal action routing, cooldown behavior, and Deployment ownership resolution.
+
+## Contributing
+
+This is a personal learning project, but issues and pull requests are welcome.
 
 ## License
 
-MIT
+MIT licensed. See [LICENSE](LICENSE).
