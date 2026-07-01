@@ -4,6 +4,29 @@ KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for 
 
 > **Scope:** This weekend build targets a local [kind](https://kind.sigs.k8s.io/) cluster only — no cloud IAM, ingress controllers, or multi-cluster federation.
 
+## Live results
+
+These screenshots show real data captured from a running KubeGuardian demo with the controller, Prometheus, and Grafana all active.
+
+The images demonstrate the project goal:
+- detecting pod failures in a local kind cluster
+- healing crashlooping workloads automatically
+- exposing Prometheus metrics for incidents and actions
+- logging incidents to a JSON-lines file
+- showing live pod state from Kubernetes
+
+| Grafana dashboard | Prometheus query |
+|---|---|
+| ![Grafana dashboard](docs/screenshots/grafana-live.png) | ![Prometheus query](docs/screenshots/prometheus-live.png) |
+
+| Metrics endpoint output | Incident log |
+|---|---|
+| ![Metrics output](docs/screenshots/metrics-live.png) | ![Incident log](docs/screenshots/incident-log-live.png) |
+
+| Pod state |
+|---|
+| ![kubectl pods](docs/screenshots/kubectl-pods-live.png) |
+
 ## Architecture
 
 ```
@@ -57,6 +80,8 @@ A per-workload **cooldown** prevents heal loops. Default is 300 seconds (`HEAL_C
 kubeguardian/
 ├── controller/           # Python controller
 ├── deploy/               # ServiceAccount, RBAC, in-cluster Deployment
+├── docs/screenshots/     # README demo screenshots
+├── scripts/              # Screenshot generator
 ├── tests/                # pytest unit tests
 ├── test-workloads/       # Demo Deployments for kind
 ├── monitoring/           # Prometheus + Grafana config
@@ -232,6 +257,7 @@ Planned next phases (not in this build):
 pip install -r requirements-dev.txt
 pytest
 python -m controller.main
+python scripts/generate_screenshots.py   # refresh README demo images
 ```
 
 Unit tests cover pod failure detection (CrashLoopBackOff, Pending threshold, Failed), heal action routing, cooldown behavior, and Deployment ownership resolution (pod → ReplicaSet → Deployment via `ownerReferences`).
