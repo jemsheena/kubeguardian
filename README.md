@@ -1,11 +1,19 @@
 # KubeGuardian
 
-KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for local kind clusters. It detects failing pods, remediates them automatically, exports Prometheus metrics, and logs incidents to a JSON-lines file.
+KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer. It detects failing pods, remediates them automatically, exports Prometheus metrics, and logs incidents to a JSON-lines file. It runs against a local kind cluster for development and demos, and can also target a GKE cluster.
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[
 
-> Scope: this build targets a local kind cluster only — no cloud IAM, ingress controllers, or multi-cluster federation.
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+
+](https://www.python.org/)
+[
+
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
+
+](LICENSE)
+
+> Scope: this build targets a local kind cluster for the primary demo, with optional support for a GKE cluster. No ingress controllers or multi-cluster federation.
 
 ## Table of contents
 
@@ -20,6 +28,7 @@ KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for 
     - [Option A](#option-a--on-the-host-recommended-for-kind)
     - [Option B](#option-b--via-docker-compose)
     - [Option C](#option-c--in-cluster-rbac-included)
+- [Deploying to GKE](#deploying-to-gke)
 - [Configuration](#configuration)
 - [Metrics and observability](#metrics-and-observability)
 - [Roadmap](#roadmap)
@@ -29,7 +38,7 @@ KubeGuardian is a lightweight Kubernetes pod health watcher and auto-healer for 
 
 ## Features
 
-- Watch pods in a local kind cluster and detect CrashLoopBackOff, Pending, and Failed states.
+- Watch pods in a local kind cluster (or a GKE cluster) and detect CrashLoopBackOff, Pending, and Failed states.
 - Heal crash-looping workloads by deleting pods and restarting rollout-managed workloads via Deployment patching.
 - Expose Prometheus metrics for detected incidents, resolved incidents, and healing actions.
 - Persist incidents as JSON-lines for local demos and future database-backed storage.
@@ -48,17 +57,33 @@ The images demonstrate the project goal:
 
 | Grafana dashboard | Prometheus query |
 |---|---|
-| ![Grafana dashboard](docs/screenshots/Screenshot%202026-07-01%20221905.png) | ![Prometheus query](docs/screenshots/Screenshot%202026-07-01%20221915.png) |
+| 
+
+![Grafana dashboard](docs/screenshots/Screenshot%202026-07-01%20221905.png)
+
+ | 
+
+![Prometheus query](docs/screenshots/Screenshot%202026-07-01%20221915.png)
+
+ |
 
 | Metrics endpoint output | Pod state |
 |---|---|
-| ![Metrics endpoint output](docs/screenshots/Screenshot%202026-07-01%20221927.png) | ![Pod state](docs/screenshots/Screenshot%202026-07-01%20222300.png) |
+| 
+
+![Metrics endpoint output](docs/screenshots/Screenshot%202026-07-01%20221927.png)
+
+ | 
+
+![Pod state](docs/screenshots/Screenshot%202026-07-01%20222300.png)
+
+ |
 
 ## Architecture
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│                        kind cluster                              │
+│                  kind cluster / GKE cluster                      │
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────────────┐ │
 │  │ crashloop    │   │ healthy-demo │   │ other workloads      │ │
 │  │ Deployment   │   │ Deployment   │   │                      │ │
@@ -102,6 +127,8 @@ For Pending and Failed rollout restarts, the healer resolves the owning Deployme
 Default Pending threshold is 120 seconds (`PENDING_THRESHOLD_SECONDS`). The Compose stack overrides this to 60 seconds for faster local demos.
 
 A per-workload cooldown prevents heal loops. The default is 300 seconds (`HEAL_COOLDOWN_SECONDS`), and the Compose stack sets it to 120 seconds.
+
+This detection and remediation logic is cluster-agnostic — the same controller code runs unmodified against kind or GKE; only the kubeconfig/credentials target changes.
 
 ## Project layout
 
@@ -225,6 +252,10 @@ docker compose up prometheus grafana
 
 Prometheus scrapes `controller:8000` when the controller runs in Docker Compose, and `host.docker.internal:8000` when the controller runs on the host.
 
+## Deploying to GKE
+
+GKE support is in progress; kind is the primary supported target for now. Detailed GKE setup instructions will be added here once finalized.
+
 ## Configuration
 
 Environment variables (see `controller/config.py`):
@@ -259,6 +290,7 @@ This file is a stand-in for PostgreSQL persistence in a later phase.
 
 Planned next phases (not in this build):
 
+- GKE deployment — finalize instructions and config (see [Deploying to GKE](#deploying-to-gke))
 - PostgreSQL — durable incident store replacing JSON-lines log
 - Helm chart — package the controller for in-cluster deployment
 - GitHub Actions CI/CD — lint, test, and image publish on merge
