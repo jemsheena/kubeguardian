@@ -20,8 +20,8 @@ spec:
       serviceAccountName: kubeguardian
       containers:
         - name: controller
-          image: kubeguardian:latest
-          imagePullPolicy: IfNotPresent
+          image: asia-south1-docker.pkg.dev/kubeguardian-505219/kubeguardian/kubeguardian:latest
+          imagePullPolicy: Always
           ports:
             - name: metrics
               containerPort: 8000
@@ -32,6 +32,8 @@ spec:
               value: "60"
             - name: HEAL_COOLDOWN_SECONDS
               value: "120"
+            - name: WATCH_NAMESPACES
+              value: default
             - name: INCIDENT_LOG_PATH
               value: /var/log/kubeguardian/incidents.jsonl
           volumeMounts:
